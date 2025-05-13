@@ -1,0 +1,65 @@
+# Install dependencies: pip install transformers torch
+
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+import torch
+import os
+
+def load_biobert_model():
+    print("Loading BioBERT model and tokenizer...")
+    model_name = "dmis-lab/biobert-base-cased-v1.1"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForQuestionAnswering.from_pretrained(model_name)
+    return tokenizer, model
+
+def answer_question(question, context, tokenizer, model):
+    inputs = tokenizer(question, context, return_tensors="pt", truncation=True, max_length=512)
+    with torch.no_grad():
+        outputs = model(**inputs)
+
+    start_idx = torch.argmax(outputs.start_logits)
+    end_idx = torch.argmax(outputs.end_logits) + 1
+
+    input_ids = inputs["input_ids"][0][start_idx:end_idx]
+    answer = tokenizer.decode(input_ids, skip_special_tokens=True)
+    return answer
+
+def get_context():
+    print("\nChoose context input method:")
+    print("1. Use built-in medical paragraph")
+    print("2. Load context from a text file")
+    choice = input("Enter choice (1 or 2): ")
+
+    if choice.strip() == "2":
+        file_path = input("Enter full path to your .txt file: ").strip()
+        if os.path.isfile(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        else:
+            print("File not found. Using default context instead.")
+    
+    # Default context
+    return (
+        "Diabetes mellitus is a group of metabolic diseases characterized by high blood sugar levels over a prolonged period. "
+        "Symptoms often include frequent urination, increased thirst, and increased appetite. "
+        "If left untreated, diabetes can cause many complications. Acute complications include diabetic ketoacidosis, "
+        "hyperosmolar hyperglycemic state, or death. Serious long-term complications include cardiovascular disease, "
+        "stroke, chronic kidney disease, foot ulcers, and damage to the eyes."
+    )
+
+def main():
+    tokenizer, model = load_biobert_model()
+    context = get_context()
+
+    while True:
+        print("\nEnter a medical question (or type 'exit' to quit):")
+        question = input("Question: ").strip()
+        if question.lower() == 'exit':
+            print("Exiting.")
+            break
+
+        answer = answer_question(question, context, tokenizer, model)
+        print(f"Answer: {answer}")
+
+if __name__ == "__main__":
+    main()
+    
